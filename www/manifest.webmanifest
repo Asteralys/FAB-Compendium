@@ -1,0 +1,19 @@
+{
+  "name": "FaB Compendium",
+  "short_name": "Compendium",
+  "description": "Compagnon Flesh and Blood : compteur de vie par héros, decks, plans de side, winrate et tournois.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#120600",
+  "theme_color": "#120600",
+  "lang": "fr",
+  "categories": ["games", "utilities"],
+  "icons": [
+    { "src": "./icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

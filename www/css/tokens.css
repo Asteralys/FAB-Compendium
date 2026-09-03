@@ -1,0 +1,86 @@
+/* =============================================================
+   Jetons de design — DA reprise de fabtcg.com
+   Fond ember-black #120600, parchemin #F9E6C5, or #DAB45F,
+   sang #91160D, cuir #423115. Triade de pitch (rouge/jaune/bleu)
+   utilisée comme couleur fonctionnelle, comme sur les cartes.
+   ============================================================= */
+
+:root {
+  /* — peau « Ombre » (par défaut) — */
+  --ground:         #120600;
+  --ground-deep:    #0a0300;
+  --surface:        #1e120d;
+  --surface-2:      #2a1a12;
+  --surface-3:      #35231a;
+  --edge:           #4a3519;
+  --edge-soft:      #2e1f14;
+
+  --parchment:      #f9e6c5;
+  --parchment-dim:  #b0966f;
+  --parchment-faint:#7d6a50;
+
+  --gold:           #dab45f;
+  --gold-deep:      #8a6e33;
+  --gold-glow:      rgba(218, 180, 95, .22);
+
+  --blood:          #91160d;
+  --blood-bright:   #c1301f;
+
+  --pitch-red:      #c0392b;
+  --pitch-yellow:   #e8b84b;
+  --pitch-blue:     #3b7dd8;
+
+  --win:            #7d9a4a;
+  --loss:           #b4453a;
+
+  --scrim: linear-gradient(180deg, rgba(10,3,0,.05) 0%, rgba(10,3,0,.55) 55%, rgba(10,3,0,.93) 100%);
+  --rule: linear-gradient(90deg, transparent, var(--edge) 15%, var(--gold-deep) 50%, var(--edge) 85%, transparent);
+  --shadow-card: inset 0 1px 0 rgba(218,180,95,.06), 0 10px 26px rgba(0,0,0,.55);
+  --shadow-lift: 0 18px 44px rgba(0,0,0,.7);
+
+  /* — typographie — */
+  --font-display: "Grenze", "Iowan Old Style", Georgia, serif;
+  --font-ui: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+
+  --step--1: 0.8125rem;
+  --step-0:  0.9375rem;
+  --step-1:  1.0625rem;
+  --step-2:  1.3125rem;
+  --step-3:  1.75rem;
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+
+  --tap: 44px;
+  --shell: 560px;
+}
+
+/* — peau « Vélin » : même DA, tirage clair pour jouer en plein jour — */
+:root[data-skin="vellum"] {
+  --ground:         #e8dcc2;
+  --ground-deep:    #d9caab;
+  --surface:        #f3e9d3;
+  --surface-2:      #e9dcc0;
+  --surface-3:      #dfceac;
+  --edge:           #c0a976;
+  --edge-soft:      #d8c7a3;
+
+  --parchment:      #241408;
+  --parchment-dim:  #6b543a;
+  --parchment-faint:#8d7a5c;
+
+  --gold:           #8a6414;
+  --gold-deep:      #b99b56;
+  --gold-glow:      rgba(138, 100, 20, .16);
+
+  --blood:          #8e1f14;
+  --blood-bright:   #a92c1d;
+
+  --win:            #4f6b28;
+  --loss:           #8e2f24;
+
+  --scrim: linear-gradient(180deg, rgba(20,8,0,.02) 0%, rgba(20,8,0,.42) 55%, rgba(20,8,0,.86) 100%);
+  --shadow-card: inset 0 1px 0 rgba(255,255,255,.5), 0 8px 20px rgba(80,60,25,.18);
+  --shadow-lift: 0 18px 44px rgba(80,60,25,.28);
+}

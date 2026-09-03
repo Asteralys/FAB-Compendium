@@ -1,0 +1,22 @@
+{
+  "appId": "net.compendium.fab",
+  "appName": "FaB Compendium",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#120600",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "backgroundColor": "#120600",
+      "androidSplashResourceName": "splash"
+    }
+  }
+}

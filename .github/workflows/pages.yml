@@ -1,0 +1,47 @@
+name: Pages (PWA)
+
+# Publie www/ sur GitHub Pages à chaque push sur main : la façon la plus
+# rapide de tester sur téléphone — ouvrir le lien, "Ajouter à l'écran
+# d'accueil", et l'app s'installe sans passer par un APK. Contrairement à
+# l'aperçu Artifact, un vrai hébergement ne bloque pas les illustrations.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rafraîchir les données
+        run: npm run data
+
+      - name: Générer les icônes
+        run: npm run icon
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: www
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

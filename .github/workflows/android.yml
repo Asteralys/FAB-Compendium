@@ -1,0 +1,54 @@
+name: APK Android
+
+# Construit l'APK dans le cloud : aucun Android Studio ni JDK à installer
+# sur ta machine. Onglet Actions → « APK Android » → Run workflow.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Installer les dépendances
+        run: npm install
+
+      - name: Rafraîchir les données
+        run: npm run data
+
+      - name: Générer les icônes
+        run: npm run icon
+
+      - name: Préparer le projet Android
+        run: |
+          npx cap add android
+          npx --yes @capacitor/assets generate --android \
+            --iconBackgroundColor '#120600' \
+            --iconBackgroundColorDark '#120600' \
+            --splashBackgroundColor '#120600' \
+            --splashBackgroundColorDark '#120600' || true
+          npx cap sync android
+
+      - name: Compiler l'APK de test
+        run: |
+          chmod +x android/gradlew
+          cd android && ./gradlew assembleDebug --no-daemon
+
+      - name: Publier l'APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: fab-compendium-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

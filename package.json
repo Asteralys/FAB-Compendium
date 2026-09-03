@@ -1,0 +1,26 @@
+{
+  "name": "fab-compendium",
+  "version": "1.0.0",
+  "description": "Compagnon mobile Flesh and Blood : compteur de vie, decks, plans de side, winrate, tournois.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node tools/dev-server.mjs",
+    "heroes": "node tools/build-heroes.mjs",
+    "cards": "node tools/build-cards.mjs",
+    "ll": "node tools/build-ll.mjs",
+    "banned": "node tools/build-banned.mjs",
+    "data": "npm run heroes && npm run cards && npm run ll && npm run banned",
+    "icon": "node tools/make-icon.mjs",
+    "bundle": "node tools/bundle-artifact.mjs",
+    "android:add": "cap add android",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
+    "android:apk": "cap sync android && cd android && gradlew.bat assembleDebug"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  }
+}

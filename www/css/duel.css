@@ -1,0 +1,364 @@
+/* =============================================================
+   Écran de duel — deux tapis pleine largeur, illustration du
+   héros en fond, panneau adverse retourné pour le face-à-face.
+   ============================================================= */
+
+.duel {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;
+}
+
+/* ---------------------------- tapis --------------------------- */
+
+.seat {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--ground-deep);
+}
+.seat.is-flipped { transform: rotate(180deg); }
+
+/* On agrandit la carte pour ne garder que la fenêtre d'illustration :
+   le cadre imprimé, le titre et la boîte de texte sortent du champ. */
+.seat .art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  transform: scale(1.34);
+  z-index: -2;
+  filter: saturate(.94) contrast(1.04);
+}
+.seat .veil {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--scrim);
+}
+.seat[data-side="p2"] .veil { box-shadow: inset 0 0 90px rgba(145,22,13,.35); }
+.seat[data-side="p1"] .veil { box-shadow: inset 0 0 90px rgba(218,180,95,.16); }
+.seat.no-art .veil { background: linear-gradient(180deg, var(--surface-2), var(--ground-deep)); }
+
+/* zones de tap : moitié gauche = retirer, moitié droite = ajouter */
+.tapzone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  color: var(--parchment);
+  opacity: .55;
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: 1.9rem;
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(0,0,0,.8);
+}
+.tapzone.minus { left: 0; justify-content: flex-start; }
+.tapzone.plus  { right: 0; justify-content: flex-end; }
+.tapzone:active { opacity: 1; background: radial-gradient(60% 50% at 50% 50%, rgba(255,255,255,.09), transparent 70%); }
+
+/* --------------------------- contenu -------------------------- */
+
+.seat .content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 10px 14px 12px;
+  pointer-events: none;
+  text-align: center;
+}
+/* Rien ici n'est interactif : le nom, les PV et le pied de carte laissent
+   passer le tap jusqu'aux zones +/- en dessous, sur toute leur hauteur.
+   Un `pointer-events: auto` sur ces enfants (essayé plus tôt) créait des
+   bandes mortes en haut et en bas de chaque tapis. */
+
+.seat .banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.seat .heroname {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 10px rgba(0,0,0,.9);
+}
+.seat .herometa {
+  font-size: .72rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+  text-shadow: 0 2px 8px rgba(0,0,0,.9);
+}
+
+.lifewrap {
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+.life {
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: clamp(3.6rem, 21vw, 7rem);
+  line-height: .86;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  color: var(--parchment);
+  text-shadow: 0 3px 0 rgba(0,0,0,.55), 0 0 34px rgba(0,0,0,.9);
+  transition: color .25s ease, transform .12s ease;
+}
+.life.bump { transform: scale(1.07); }
+.life.low { color: var(--pitch-yellow); }
+.life.critical { color: var(--blood-bright); text-shadow: 0 3px 0 rgba(0,0,0,.6), 0 0 40px rgba(193,48,31,.6); }
+.life.dead { color: var(--blood-bright); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .55 } }
+
+/* delta flottant : « −4 » cumulé pendant 1,6 s avant d'entrer au journal */
+.delta {
+  position: absolute;
+  top: calc(50% - 4.4rem);
+  font-family: var(--font-ui);
+  font-weight: 900;
+  font-size: 1.5rem;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: rgba(10,3,0,.75);
+  border: 1px solid var(--edge);
+  font-variant-numeric: tabular-nums;
+  animation: rise .18s ease;
+}
+.delta.neg { color: var(--blood-bright); border-color: color-mix(in srgb, var(--blood-bright) 50%, var(--edge)); }
+.delta.pos { color: var(--win); border-color: color-mix(in srgb, var(--win) 50%, var(--edge)); }
+
+.seat .footer { display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+.pipbar { display: flex; gap: 3px; align-items: center; justify-content: center; }
+.pip { width: 5px; height: 5px; border-radius: 50%; background: rgba(249,230,197,.22); }
+.pip.on { background: var(--gold); box-shadow: 0 0 6px var(--gold-glow); }
+
+/* --------------------------- barre ---------------------------- */
+
+.rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 6px 8px;
+  background: linear-gradient(180deg, var(--surface-3), var(--ground-deep));
+  border-block: 1px solid var(--edge);
+  box-shadow: 0 0 24px rgba(0,0,0,.6);
+}
+.rail button {
+  flex: 1;
+  min-height: 42px;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  padding: 4px 2px;
+}
+.rail button:active { background: rgba(218,180,95,.12); }
+.rail button svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+.rail button span {
+  font-family: var(--font-display);
+  font-size: .6rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--parchment-faint);
+}
+.rail .clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: .95rem;
+  color: var(--parchment);
+}
+.rail .clock.warn { color: var(--pitch-yellow); }
+.rail .clock.over { color: var(--blood-bright); }
+
+/* ------------------------- journal ---------------------------- */
+
+.log { display: flex; flex-direction: column; gap: 2px; }
+.logrow {
+  display: grid;
+  grid-template-columns: 46px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--edge-soft);
+  font-size: var(--step--1);
+}
+.logrow .t { color: var(--parchment-faint); font-variant-numeric: tabular-nums; font-size: .72rem; }
+.logrow .d { font-weight: 900; font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+.logrow .d.neg { color: var(--blood-bright); }
+.logrow .d.pos { color: var(--win); }
+.logrow .after { color: var(--parchment-dim); font-variant-numeric: tabular-nums; }
+.logrow .who { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-size: .72rem; }
+.logrow .who.p1 { color: var(--gold); }
+.logrow .who.p2 { color: var(--blood-bright); }
+
+/* --------------------- sélecteur de héros --------------------- */
+
+.heropick { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.herocard {
+  position: relative;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--ground-deep);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  aspect-ratio: 3 / 4.4;
+  display: flex;
+  flex-direction: column;
+}
+.herocard[aria-pressed="true"] { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 22px var(--gold-glow); }
+.herocard .thumb { position: relative; flex: 1; overflow: hidden; background: linear-gradient(160deg, var(--surface-3), var(--ground-deep)); display: grid; place-items: center; }
+/* L'illustration se superpose au monogramme : celui-ci ne sert que de repli. */
+.herocard .thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(2);
+  transform-origin: 50% 35%;
+}
+.herocard .thumb .mono { font-family: var(--font-display); font-size: 1.4rem; color: var(--gold); }
+.herocard .cap { padding: 5px 7px 7px; background: linear-gradient(180deg, rgba(10,3,0,.2), var(--surface)); }
+.herocard .cap b { display: block; font-size: .74rem; font-weight: 600; line-height: 1.15; }
+.herocard .cap i { font-style: normal; font-size: .66rem; color: var(--parchment-dim); letter-spacing: .06em; }
+.herocard .hp {
+  position: absolute;
+  top: 5px; right: 5px;
+  background: rgba(10,3,0,.8);
+  border: 1px solid var(--gold-deep);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: .7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.herocard .ll {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background: rgba(10,3,0,.82);
+  border: 1px solid var(--gold-deep);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: .64rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.herocard .ll.done { background: var(--gold); color: #14100a; border-color: var(--gold); }
+.herocard .agebadge {
+  position: absolute;
+  top: 5px; left: 5px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--pitch-yellow);
+  box-shadow: 0 0 0 1px rgba(10,3,0,.7);
+}
+
+.artstrip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.artstrip button {
+  position: relative;
+  flex: none;
+  width: 74px;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--edge-soft);
+  background: var(--ground-deep);
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.artstrip button[aria-pressed="true"] { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+/* L'illustration se superpose au code de set : celui-ci ne sert que de repli
+   si le réseau bloque l'image (jamais de texte brut par-dessus la vignette). */
+.artstrip .artcode { font-family: var(--font-display); color: var(--gold-deep); font-size: .74rem; letter-spacing: .06em; }
+.artstrip img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 16%; }
+
+/* ---------------------- écran de choix d'illustration ---------------------- */
+
+.pickstage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: linear-gradient(160deg, var(--surface-3), var(--ground-deep));
+  border: 1px solid var(--edge);
+  box-shadow: inset 0 0 0 1px rgba(218,180,95,.1), var(--shadow-card);
+  display: grid;
+  place-items: center;
+}
+.pickstage .mono {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  letter-spacing: .04em;
+  color: var(--gold);
+  text-shadow: 0 0 30px var(--gold-glow);
+}
+.pickstage img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 20%;
+  transform: scale(1.3);
+}
+.pickstage .veil { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(10,3,0,.85)); }
+.pickstage .meta { position: absolute; left: 14px; right: 14px; bottom: 12px; }
+.pickstage .meta b { display: block; font-family: var(--font-display); font-size: 1.3rem; color: var(--parchment); letter-spacing: .02em; }
+.pickstage .meta span { display: block; font-size: .76rem; color: var(--parchment-dim); letter-spacing: .03em; margin-top: 2px; }
+
+/* ------------------------ mise en place ----------------------- */
+
+.setup { padding: 14px 16px calc(96px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; }
+.sidechoice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sidechoice .slot {
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--r-md);
+  padding: 10px;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+}
+.sidechoice .slot.p1 { border-top: 2px solid var(--gold); }
+.sidechoice .slot.p2 { border-top: 2px solid var(--blood-bright); }
+.sidechoice .slot .who { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .14em; font-size: .7rem; }
+.sidechoice .slot.p1 .who { color: var(--gold); }
+.sidechoice .slot.p2 .who { color: var(--blood-bright); }
+.sidechoice .slot .hn { font-weight: 600; font-size: .88rem; line-height: 1.2; }

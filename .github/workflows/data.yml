@@ -1,0 +1,37 @@
+name: Rafraîchir les données
+
+# Les points Living Legend bougent après chaque annonce officielle (contrôle
+# tous les lundis). On relit la page chaque mardi matin et on committe si
+# quelque chose a changé — héros, cartes et classement d'un seul coup.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 2"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Régénérer héros, cartes et classement
+        run: npm run data
+
+      - name: Committer les changements
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet www/data; then
+            echo "Aucun changement."
+          else
+            git add www/data
+            git commit -m "Données : héros, cartes et classement Living Legend"
+            git push
+          fi

@@ -1,0 +1,163 @@
+/* =============================================================
+   Socle : reset, typographie, coquille applicative, navigation
+   ============================================================= */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--ground);
+  color: var(--parchment);
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  line-height: 1.45;
+  /* Grenze passe en chiffres elzéviriens par défaut : on force les capitales. */
+  font-variant-numeric: lining-nums;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Grain + vignette : la texture « cuir sombre » du site FaB, sans image externe. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .5;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(218,180,95,.07), transparent 60%),
+    radial-gradient(100% 70% at 50% 110%, rgba(145,22,13,.10), transparent 65%);
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { -webkit-appearance: none; appearance: none; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+img { max-width: 100%; display: block; }
+
+/* Les pictogrammes sont tracés au trait et suivent la couleur du texte. */
+svg { fill: none; stroke: currentColor; stroke-width: 1.6; flex: none; }
+svg:not([width]) { width: 18px; height: 18px; }
+
+a { color: var(--gold); text-underline-offset: 3px; }
+
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+/* ------------------------- coquille ------------------------- */
+
+.shell {
+  position: relative;
+  z-index: 1;
+  max-width: var(--shell);
+  margin-inline: auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background: linear-gradient(180deg, var(--ground) 70%, transparent);
+}
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 12px; right: 12px; bottom: 0;
+  height: 1px;
+  background: var(--rule);
+  opacity: .8;
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--parchment);
+  display: flex;
+  align-items: baseline;
+  gap: .45em;
+}
+.wordmark em {
+  font-style: normal;
+  color: var(--gold);
+  font-size: .78em;
+  letter-spacing: .3em;
+}
+
+.view {
+  flex: 1;
+  padding: 14px 16px calc(96px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.view.is-duel {
+  padding: 0 0 calc(62px + env(safe-area-inset-bottom));
+  gap: 0;
+  min-height: 0;
+}
+
+/* ------------------------ navigation ------------------------ */
+
+.tabbar {
+  position: fixed;
+  z-index: 30;
+  bottom: 0; left: 0; right: 0;
+  max-width: var(--shell);
+  margin-inline: auto;
+  display: flex;
+  background: linear-gradient(180deg, var(--surface), var(--ground-deep));
+  border-top: 1px solid var(--edge);
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -12px 30px rgba(0,0,0,.5);
+}
+
+.tabbar button {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap);
+  background: none;
+  border: 0;
+  padding: 8px 1px 9px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--parchment-faint);
+  font-family: var(--font-display);
+  font-size: .66rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  transition: color .18s ease;
+}
+.tabbar button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabbar svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+.tabbar button[aria-selected="true"] { color: var(--gold); }
+.tabbar button[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  width: 30px;
+  height: 2px;
+  background: var(--gold);
+  box-shadow: 0 0 12px var(--gold-glow);
+}
