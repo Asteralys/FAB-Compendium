@@ -229,7 +229,7 @@ function board() {
       ${railButton("side", "cards", "Side")}
       ${railButton("log", "history", "Journal")}
       <button data-act="timer" class="timerbtn">
-        <span class="clock" data-clock>${clock(elapsed())}</span>
+        <span class="clock" data-clock>${clock(remaining())}</span>
         <span>${d.timer.running ? "Pause" : "Chrono"}</span>
       </button>
       ${railButton("end", "flag", "Fin")}
@@ -243,6 +243,13 @@ const elapsed = () => {
   if (!t) return 0;
   return t.elapsed + (t.running ? (Date.now() - t.since) / 1000 : 0);
 };
+
+/**
+ * Temps restant avant l'alerte de ronde — un décompte, pas un chrono qui
+ * s'allonge. `clock()` ramène tout seul un temps négatif à 00:00 une fois
+ * la limite dépassée.
+ */
+const remaining = () => (S.prefs.roundLimit || 40) * 60 - elapsed();
 
 /* ------------------------ interactions ----------------------- */
 
@@ -285,11 +292,10 @@ function startTick(root) {
   tick = setInterval(() => {
     const el = qs("[data-clock]", root);
     if (!el || !S.duel) return;
-    const secs = elapsed();
-    el.textContent = clock(secs);
-    const limit = (S.prefs.roundLimit || 40) * 60;
-    el.classList.toggle("warn", secs > limit - 300 && secs <= limit);
-    el.classList.toggle("over", secs > limit);
+    const left = remaining();
+    el.textContent = clock(left);
+    el.classList.toggle("warn", left <= 300 && left > 0);
+    el.classList.toggle("over", left <= 0);
   }, 1000);
 }
 
