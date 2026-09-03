@@ -5,13 +5,15 @@
  * n'importe quel autre match, sans logique séparée à maintenir.
  */
 
-import { html } from "../core/dom.js";
+import { html, toast } from "../core/dom.js";
 import { S, commit, uid, deckById, tournamentById, record } from "../core/store.js";
 import { heroById, allHeroes } from "../data/heroes.js";
 import { openSheet, closeSheet, confirmSheet } from "../ui/sheet.js";
+import { pickHero } from "../ui/heropicker.js";
 import { crest, ratePill, formatDate, dayNumber, monthLabel, countdown, today } from "../ui/components.js";
 import { icon } from "../ui/icons.js";
-import { FORMATS } from "../data/rules.js";
+import { FORMATS, ageMismatchIssue } from "../data/rules.js";
+import { goToTab } from "../core/nav.js";
 
 const KINDS = ["Armory", "Skirmish", "Road to Nationals", "Battle Hardened", "Pro Quest", "Nationals", "Calling", "Pro Tour", "Casual"];
 const BO = ["Bo1", "Bo3"];
@@ -104,7 +106,8 @@ function detail(t) {
         <div class="eyebrow">Rondes</div>
         <h2 class="title-sm">${rounds.length ? `${rounds.length} round${rounds.length > 1 ? "s" : ""}` : "Rounds"}</h2>
       </div>
-      <button class="btn" id="tr-addround">${icon("plus")} Round</button>
+      <button class="btn ghost" id="tr-addround-manual" style="min-height:38px;padding:6px 12px">Saisir</button>
+      <button class="btn" id="tr-addround">${icon("plus")} Lancer un round</button>
     </div>
 
     ${rounds.length
@@ -141,7 +144,8 @@ export function mount(root) {
 
     if (e.target.closest("#tr-back")) { openId = null; commit(); return; }
     if (e.target.closest("#tr-edit")) { form(openId); return; }
-    if (e.target.closest("#tr-addround")) { roundForm(openId, null); return; }
+    if (e.target.closest("#tr-addround")) { launchRound(openId); return; }
+    if (e.target.closest("#tr-addround-manual")) { roundForm(openId, null); return; }
 
     const round = e.target.closest("[data-round]");
     if (round) { roundForm(openId, round.dataset.round); return; }
@@ -206,6 +210,88 @@ function form(id) {
 }
 
 /* ----------------------------- rondes -------------------------------- */
+
+/**
+ * Choisit le deck piloté pour ce round précis — pas forcément celui du
+ * tournoi si le joueur pilote plusieurs decks au fil des rondes — pour que
+ * les statistiques par deck restent justes. Résout `undefined` si annulé,
+ * `null`/"" si « pas de deck », sinon l'id du deck choisi.
+ */
+function pickRoundDeck(defaultDeckId) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (v) => { if (!settled) { settled = true; resolve(v); } };
+
+    const inner = openSheet(`<h3>Quel deck pour ce round ?</h3>
+      <label class="field"><span>Deck</span>
+        <select id="rd-deck">
+          <option value="">— pas de deck, juste un héros —</option>
+          ${S.decks.map((d) => `<option value="${d.id}" ${d.id === defaultDeckId ? "selected" : ""}>${d.name}</option>`).join("")}
+        </select>
+      </label>
+      <div class="actions"><button class="btn" data-close>Annuler</button>
+        <button class="btn primary" id="rd-ok">Continuer</button></div>`,
+      { onClose: () => finish(undefined) }
+    );
+
+    inner.querySelector("#rd-ok").addEventListener("click", () => {
+      const v = inner.querySelector("#rd-deck").value || null;
+      finish(v);
+      closeSheet();
+    });
+  });
+}
+
+/**
+ * Lance un round comme un vrai duel : choix du deck, des héros, puis bascule
+ * sur l'onglet Duel avec le compteur de vie. À la fin de la partie, duel.js
+ * enregistre le résultat directement dans ce round (voir recordMatch).
+ */
+async function launchRound(tournamentId) {
+  const t = tournamentById(tournamentId);
+  if (!t) return;
+  if (S.duel) { toast("Termine d'abord le duel en cours (onglet Duel) avant d'en lancer un autre."); return; }
+
+  let deckId = null;
+  if (S.decks.length) {
+    deckId = await pickRoundDeck(t.deckId);
+    if (deckId === undefined) return;
+  }
+
+  const deck = deckId ? deckById(deckId) : null;
+  let p1 = deck ? { heroId: deck.heroId, artUrl: S.prefs.artByHero?.[deck.heroId] || heroById(deck.heroId)?.arts?.[0]?.url || null } : null;
+  if (!p1?.heroId) {
+    p1 = await pickHero({ title: "Mon héros" });
+    if (!p1) return;
+  }
+
+  const p2 = await pickHero({ title: "Héros adverse" });
+  if (!p2) return;
+
+  const h1 = heroById(p1.heroId);
+  const h2 = heroById(p2.heroId);
+  const mismatch = ageMismatchIssue(h1, h2);
+  if (mismatch) { toast(mismatch); return; }
+
+  const rounds = tournamentRounds(tournamentId);
+  const round = rounds.length ? Math.max(...rounds.map((x) => x.round || 0)) + 1 : 1;
+
+  S.duel = {
+    startedAt: Date.now(),
+    format: t.format || "Classic Constructed",
+    event: t.name,
+    initiative: null,
+    tournamentId: t.id,
+    round,
+    bo: "Bo1",
+    p1: { heroId: p1.heroId, artUrl: p1.artUrl, deckId, life: h1.life, max: h1.life },
+    p2: { heroId: p2.heroId, artUrl: p2.artUrl, oppDeck: "", life: h2.life, max: h2.life },
+    log: [],
+    timer: { running: false, elapsed: 0, since: 0 }
+  };
+  commit();
+  goToTab("duel");
+}
 
 function roundForm(tournamentId, matchId) {
   const t = tournamentById(tournamentId);
@@ -279,3 +365,6 @@ function roundForm(tournamentId, matchId) {
 
 const attr = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const escapeText = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+/** Ouvre directement la fiche d'un tournoi (utilisé depuis duel.js en fin de round). */
+export function openTournament(id) { openId = id; }

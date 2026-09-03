@@ -15,6 +15,7 @@ const SHELL = [
   "./js/main.js",
   "./js/core/dom.js",
   "./js/core/store.js",
+  "./js/core/nav.js",
   "./js/data/heroes.js",
   "./js/data/cards.js",
   "./js/data/rules.js",

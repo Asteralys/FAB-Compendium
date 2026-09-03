@@ -18,6 +18,7 @@ const CSS = ["tokens", "base", "components", "duel", "views"].map((n) => `css/${
 const MODULES = [
   "core/dom.js",
   "core/store.js",
+  "core/nav.js",
   "data/slim.js",
   "data/heroes.js",
   "data/cards.js",
@@ -30,10 +31,10 @@ const MODULES = [
   "ui/components.js",
   "ui/heropicker.js",
   "ui/settings.js",
-  "views/duel.js",
   "views/decks.js",
-  "views/stats.js",
   "views/tournaments.js",
+  "views/duel.js",
+  "views/stats.js",
   "views/news.js",
   "views/banlist.js",
   "main.js"

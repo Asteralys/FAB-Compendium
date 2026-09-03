@@ -15,6 +15,8 @@ import { openSheet, closeSheet, confirmSheet } from "../ui/sheet.js";
 import { pickHero } from "../ui/heropicker.js";
 import { crest, clock, today } from "../ui/components.js";
 import { FORMATS, ageMismatchIssue } from "../data/rules.js";
+import { openTournament } from "./tournaments.js";
+import { goToTab } from "../core/nav.js";
 
 const BATCH_MS = 3000;
 
@@ -321,7 +323,12 @@ function nudge(root, side, step) {
 }
 
 /** Verse les coups accumulés dans le journal. */
-function flushPending(root = document) {
+/**
+ * @param {boolean} autoEnd Propose la fin de partie si un PV est tombé à 0.
+ *   À false pour les appels internes à endSheet lui-même (sinon boucle : il
+ *   vide déjà les coups en attente avant d'afficher sa propre feuille).
+ */
+function flushPending(root = document, autoEnd = true) {
   clearTimeout(flushTimer);
   flushTimer = null;
   let wrote = false;
@@ -339,13 +346,20 @@ function flushPending(root = document) {
     const el = qs(`[data-delta="${side}"]`, root);
     if (el) el.hidden = true;
   }
-  if (wrote) save();
+  if (!wrote) return;
+  save();
+
+  // Un des deux est tombé à 0 (ou moins) et le chiffre s'est stabilisé :
+  // on propose directement d'enregistrer le résultat, sans étape en plus.
+  if (autoEnd && S.duel && (S.duel.p1.life <= 0 || S.duel.p2.life <= 0) && !qs(".sheet")) {
+    endSheet(root);
+  }
 }
 
 /* --------------------------- actions ------------------------- */
 
 function undo(root) {
-  flushPending(root);
+  flushPending(root, false);
   const entry = S.duel.log.pop();
   if (!entry) { toast("Rien à annuler"); return; }
   S.duel[entry.side].life -= entry.delta;
@@ -360,7 +374,7 @@ function toggleTimer() {
 }
 
 function openLog(root) {
-  flushPending(root);
+  flushPending(root, false);
   const rows = [...S.duel.log].reverse();
   const inner = openSheet(
     `<h3>Journal des dégâts</h3>
@@ -414,18 +428,25 @@ const escapeText = (t) => String(t ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp
 const listItems = (t) => String(t ?? "").split("\n").filter(Boolean).map((l) => `<li>${escapeText(l)}</li>`).join("") || "<li class='faint'>—</li>";
 
 function endSheet(root) {
-  flushPending(root);
+  flushPending(root, false);
   const d = S.duel;
   const h1 = heroById(d.p1.heroId);
   const h2 = heroById(d.p2.heroId);
+  const p1Down = d.p1.life <= 0;
+  const p2Down = d.p2.life <= 0;
 
+  // Les deux boutons proposent la même action (« tape le héros qui a gagné »).
+  // « Victoire »/« Défaite » fixés à gauche/droite induisaient en erreur :
+  // le joueur à 0 PV n'est pas toujours à gauche.
   const inner = openSheet(`<h3>Fin de partie</h3>
     <p class="small muted">Qui l'emporte ? Le match part directement dans tes statistiques.</p>
     <div class="sidechoice">
-      <button class="slot p1" data-win="p1"><span class="who">Victoire</span>
-        <span class="hn">${escapeText(h1?.name)}</span><span class="pill gold">${d.p1.life} PV</span></button>
-      <button class="slot p2" data-win="p2"><span class="who">Défaite</span>
-        <span class="hn">${escapeText(h2?.name)}</span><span class="pill">${d.p2.life} PV</span></button>
+      <button class="slot p1" data-win="p1"><span class="who">Vainqueur</span>
+        <span class="hn">${escapeText(h1?.name)}</span>
+        <span class="pill ${p1Down ? "loss" : "gold"}">${d.p1.life} PV${p1Down ? " · à terre" : ""}</span></button>
+      <button class="slot p2" data-win="p2"><span class="who">Vainqueur</span>
+        <span class="hn">${escapeText(h2?.name)}</span>
+        <span class="pill ${p2Down ? "loss" : "gold"}">${d.p2.life} PV${p2Down ? " · à terre" : ""}</span></button>
     </div>
     <div class="actions">
       <button class="btn" data-close>Continuer la partie</button>
@@ -448,6 +469,8 @@ function endSheet(root) {
 
 function recordMatch(winner) {
   const d = S.duel;
+  const isRound = !!d.tournamentId;
+
   S.matches.unshift({
     id: uid(),
     date: today(),
@@ -455,6 +478,7 @@ function recordMatch(winner) {
     heroId: d.p1.heroId,
     artUrl: d.p1.artUrl || null,
     oppHeroId: d.p2.heroId,
+    artUrlOpp: d.p2.artUrl || null,
     oppDeck: d.p2.oppDeck || "",
     result: winner === "p1" ? "W" : "L",
     format: d.format,
@@ -462,22 +486,35 @@ function recordMatch(winner) {
     lifeP1: d.p1.life,
     lifeP2: d.p2.life,
     duration: Math.round(elapsed()),
-    blows: d.log.length
+    blows: d.log.length,
+    ...(isRound ? { tournamentId: d.tournamentId, round: d.round, bo: d.bo } : {})
   });
 
-  // On garde héros et deck pour enchaîner la partie suivante.
-  setup = {
-    p1: { heroId: d.p1.heroId, artUrl: d.p1.artUrl, deckId: d.p1.deckId || "" },
-    p2: { heroId: d.p2.heroId, artUrl: d.p2.artUrl, oppDeck: d.p2.oppDeck || "" },
-    format: d.format,
-    event: d.event,
-    initiative: null
-  };
+  // On garde héros et deck pour enchaîner la partie suivante — sauf pour un
+  // round de tournoi, où on repart plutôt sur sa fiche pour enchaîner le suivant.
+  if (!isRound) {
+    setup = {
+      p1: { heroId: d.p1.heroId, artUrl: d.p1.artUrl, deckId: d.p1.deckId || "" },
+      p2: { heroId: d.p2.heroId, artUrl: d.p2.artUrl, oppDeck: d.p2.oppDeck || "" },
+      format: d.format,
+      event: d.event,
+      initiative: null
+    };
+  }
 
+  const tournamentId = d.tournamentId;
   S.duel = null;
   releaseWake();
-  commit();
-  toast(winner === "p1" ? "Victoire enregistrée" : "Défaite enregistrée");
+
+  if (isRound) {
+    openTournament(tournamentId);
+    commit();
+    toast(`Round ${d.round} enregistré — ${winner === "p1" ? "victoire" : "défaite"}`);
+    goToTab("tournaments");
+  } else {
+    commit();
+    toast(winner === "p1" ? "Victoire enregistrée" : "Défaite enregistrée");
+  }
 }
 
 /* ------------------------- écran allumé ---------------------- */
