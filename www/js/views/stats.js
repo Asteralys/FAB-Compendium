@@ -1,10 +1,10 @@
 /** Statistiques : winrate global, par deck, par matchup, et journal des matchs. */
 
-import { html, raw } from "../core/dom.js";
+import { html } from "../core/dom.js";
 import { S, commit, uid, deckById, record } from "../core/store.js";
-import { heroById, allHeroes } from "../data/heroes.js";
+import { heroById, preferredArt } from "../data/heroes.js";
 import { openSheet, closeSheet, confirmSheet } from "../ui/sheet.js";
-import { crest, ratePill, winBar, formatDate, today, clock } from "../ui/components.js";
+import { crest, ratePill, winBar, formatDate, today, clock, heroSelectGroups, deckOptions } from "../ui/components.js";
 import { matchupTable } from "./decks.js";
 import { icon } from "../ui/icons.js";
 
@@ -40,7 +40,7 @@ export function render() {
     ${S.decks.length ? html`<label class="field"><span>Deck</span>
       <select id="st-deckpick">
         <option value="">Tous mes decks</option>
-        ${raw(S.decks.map((d) => `<option value="${d.id}" ${d.id === selectedDeck ? "selected" : ""}>${d.name}</option>`).join(""))}
+        ${deckOptions(selectedDeck)}
       </select></label>` : ""}
 
     <div class="row wrap" style="gap:6px">
@@ -178,20 +178,15 @@ export function mount(root) {
 function matchForm() {
   let oppHeroId = null;
 
-  const adults = allHeroes().filter((h) => !h.young);
-  const young = allHeroes().filter((h) => h.young);
-  const heroOptions = (list) => list.map((h) => `<option value="${h.id}">${h.name}</option>`).join("");
-
   const inner = openSheet(`<h3>Ajouter un match</h3>
     <label class="field"><span>Mon deck</span><select id="mf-deck">
       <option value="">— sans deck —</option>
-      ${S.decks.map((d) => `<option value="${d.id}">${d.name}</option>`).join("")}
+      ${deckOptions()}
     </select></label>
     <label class="field"><span>Héros adverse</span>
       <select id="mf-opp">
         <option value="">— choisir —</option>
-        <optgroup label="Adultes">${heroOptions(adults)}</optgroup>
-        <optgroup label="Jeunes">${heroOptions(young)}</optgroup>
+        ${heroSelectGroups()}
       </select>
     </label>
     <label class="field"><span>Deck adverse</span><input id="mf-oppdeck" placeholder="optionnel"></label>
@@ -217,7 +212,7 @@ function matchForm() {
       deckId,
       heroId: deckById(deckId)?.heroId || null,
       oppHeroId,
-      artUrlOpp: S.prefs.artByHero?.[oppHeroId] || heroById(oppHeroId)?.arts?.[0]?.url || null,
+      artUrlOpp: preferredArt(oppHeroId),
       oppDeck: inner.querySelector("#mf-oppdeck").value.trim(),
       result,
       format: deckById(deckId)?.format || "",

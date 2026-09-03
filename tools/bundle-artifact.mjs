@@ -3,45 +3,77 @@
  * pour la prévisualisation partageable. Le code source reste découpé ;
  * ce fichier n'est qu'une sortie de build.
  *
+ * L'ordre d'assemblage des modules est déduit automatiquement de leurs
+ * `import` (tri topologique) plutôt que maintenu à la main : une nouvelle
+ * dépendance entre deux vues ne peut plus casser le build en silence parce
+ * qu'on a oublié de la refléter dans une liste manuelle — c'est exactement
+ * ce qui s'est produit une fois entre tournaments.js et duel.js.
+ *
  * Usage : npm run bundle
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { join, dirname, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const WWW = join(ROOT, "www");
+const JS = join(WWW, "js");
 
 const CSS = ["tokens", "base", "components", "duel", "views"].map((n) => `css/${n}.css`);
 
-/* Ordre topologique : chaque module ne dépend que de ceux qui le précèdent. */
-const MODULES = [
-  "core/dom.js",
-  "core/store.js",
-  "core/nav.js",
-  "data/slim.js",
-  "data/heroes.js",
-  "data/cards.js",
-  "data/rules.js",
-  "data/banned.js",
-  "data/ll-parse.js",
-  "data/legend.js",
-  "ui/sheet.js",
-  "ui/icons.js",
-  "ui/components.js",
-  "ui/heropicker.js",
-  "ui/settings.js",
-  "views/decks.js",
-  "views/tournaments.js",
-  "views/duel.js",
-  "views/stats.js",
-  "views/news.js",
-  "views/banlist.js",
-  "main.js"
-];
-
 const read = (p) => readFile(join(WWW, p), "utf8");
-const readModule = (p) => readFile(join(WWW, "js", p), "utf8");
+const readModule = (p) => readFile(join(JS, p), "utf8");
+
+/** Liste tous les modules .js sous www/js, chemins relatifs en style posix (ex. "views/duel.js"). */
+async function listModules(dir = "") {
+  const entries = await readdir(join(JS, dir), { withFileTypes: true });
+  const found = [];
+  for (const e of entries) {
+    const rel = dir ? posix.join(dir, e.name) : e.name;
+    if (e.isDirectory()) found.push(...await listModules(rel));
+    else if (e.name.endsWith(".js")) found.push(rel);
+  }
+  return found;
+}
+
+/** Specs importés par un module (chemins relatifs bruts, non résolus). */
+function importSpecs(source) {
+  const specs = [];
+  const re = /^import\s+[\s\S]+?\s+from\s+["'](.+?)["'];?[ \t]*$/gm;
+  let m;
+  while ((m = re.exec(source))) specs.push(m[1]);
+  return specs;
+}
+
+function resolve(from, spec) {
+  const dir = posix.dirname(from);
+  return posix.normalize(posix.join(dir, spec)).replace(/^\.\//, "");
+}
+
+/**
+ * Tri topologique par parcours en profondeur : chaque module est placé
+ * juste après tout ce dont il dépend. Un cycle authentique (A importe B qui
+ * importe A) est détecté et signalé clairement plutôt que de produire un
+ * bundle dont l'ordre est silencieusement faux.
+ */
+function topoSort(graph) {
+  const order = [];
+  const done = new Set();
+  const visiting = new Set();
+
+  function visit(key, chain) {
+    if (done.has(key)) return;
+    if (visiting.has(key)) throw new Error(`Import circulaire : ${[...chain, key].join(" → ")}`);
+    visiting.add(key);
+    for (const dep of graph.get(key) || []) visit(dep, [...chain, key]);
+    visiting.delete(key);
+    done.add(key);
+    order.push(key);
+  }
+
+  for (const key of graph.keys()) visit(key, []);
+  return order;
+}
 
 /** Réécrit un module ESM en fabrique enregistrée dans le registre __M. */
 function wrap(key, source) {
@@ -75,14 +107,21 @@ function wrap(key, source) {
   return `__M[${JSON.stringify(key)}] = (function () {\n${body}\nreturn { ${returns} };\n})();`;
 }
 
-function resolve(from, spec) {
-  const dir = posix.dirname(from);
-  return posix.normalize(posix.join(dir, spec)).replace(/^\.\//, "");
-}
+const files = await listModules();
+const sources = new Map(await Promise.all(files.map(async (f) => [f, await readModule(f)])));
+
+const graph = new Map(files.map((f) => [
+  f,
+  importSpecs(sources.get(f))
+    .filter((s) => s.startsWith(".")) // ignore d'éventuels imports externes
+    .map((s) => resolve(f, s))
+]));
+
+const order = topoSort(graph);
 
 const [css, modules, heroes, cards, legend, banned] = await Promise.all([
   Promise.all(CSS.map(read)).then((parts) => parts.join("\n")),
-  Promise.all(MODULES.map(async (m) => wrap(m, await readModule(m)))),
+  Promise.all(order.map((m) => wrap(m, sources.get(m)))),
   read("data/heroes.json"),
   read("data/cards.json"),
   read("data/living-legend.json"),
@@ -129,4 +168,4 @@ ${modules.join("\n\n")}
 await mkdir(join(ROOT, "dist"), { recursive: true });
 const out = join(ROOT, "dist", "fab-compendium.html");
 await writeFile(out, html);
-console.log(`✔ dist/fab-compendium.html — ${(html.length / 1024).toFixed(0)} Ko`);
+console.log(`✔ dist/fab-compendium.html — ${(html.length / 1024).toFixed(0)} Ko (${order.length} modules, ordre déduit des imports)`);

@@ -7,13 +7,13 @@
  * d'entrer au journal (on tape « −3 » en trois fois, une seule ligne d'historique).
  */
 
-import { html, raw, qs, qsa, toast, buzz } from "../core/dom.js";
+import { html, raw, qs, qsa, toast, buzz, esc } from "../core/dom.js";
 import { S, commit, save, uid, deckById } from "../core/store.js";
 import { heroById, heroSubtitle } from "../data/heroes.js";
 import { icon } from "../ui/icons.js";
 import { openSheet, closeSheet, confirmSheet } from "../ui/sheet.js";
 import { pickHero } from "../ui/heropicker.js";
-import { crest, clock, today } from "../ui/components.js";
+import { crest, clock, today, bulletList, deckOptions } from "../ui/components.js";
 import { FORMATS, ageMismatchIssue } from "../data/rules.js";
 import { openTournament } from "./tournaments.js";
 import { goToTab } from "../core/nav.js";
@@ -84,7 +84,7 @@ function setupScreen() {
       <label class="field"><span>Mon deck</span>
         <select id="su-deck">
           <option value="">— sans deck —</option>
-          ${raw(S.decks.map((d) => `<option value="${d.id}" ${d.id === setup.p1.deckId ? "selected" : ""}>${d.name}</option>`).join(""))}
+          ${deckOptions(setup.p1.deckId)}
         </select>
       </label>
       <label class="field"><span>Deck adverse</span>
@@ -417,15 +417,13 @@ function sidePlan() {
   const plan = (deck.plans || []).find((p) => p.oppHeroId === oppId);
   openSheet(`<h3>${deck.name} <span class="muted">vs ${opp?.name || "?"}</span></h3>
     ${plan ? `<div class="plan"><div class="swap">
-        <div class="col in"><h4>Entrées</h4><ul>${listItems(plan.in)}</ul></div>
-        <div class="col out"><h4>Sorties</h4><ul>${listItems(plan.out)}</ul></div>
-      </div>${plan.notes ? `<p class="small muted">${escapeText(plan.notes)}</p>` : ""}</div>`
+        <div class="col in"><h4>Entrées</h4><ul>${bulletList(plan.in)}</ul></div>
+        <div class="col out"><h4>Sorties</h4><ul>${bulletList(plan.out)}</ul></div>
+      </div>${plan.notes ? `<p class="small muted">${esc(plan.notes)}</p>` : ""}</div>`
       : `<div class="empty">Pas encore de plan contre ${opp?.name || "ce héros"}.<br>Tu peux le créer depuis l'onglet Decks.</div>`}
     <div class="actions"><button class="btn" data-close>Fermer</button></div>`);
 }
 
-const escapeText = (t) => String(t ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-const listItems = (t) => String(t ?? "").split("\n").filter(Boolean).map((l) => `<li>${escapeText(l)}</li>`).join("") || "<li class='faint'>—</li>";
 
 function endSheet(root) {
   flushPending(root, false);
@@ -442,10 +440,10 @@ function endSheet(root) {
     <p class="small muted">Qui l'emporte ? Le match part directement dans tes statistiques.</p>
     <div class="sidechoice">
       <button class="slot p1" data-win="p1"><span class="who">Vainqueur</span>
-        <span class="hn">${escapeText(h1?.name)}</span>
+        <span class="hn">${esc(h1?.name)}</span>
         <span class="pill ${p1Down ? "loss" : "gold"}">${d.p1.life} PV${p1Down ? " · à terre" : ""}</span></button>
       <button class="slot p2" data-win="p2"><span class="who">Vainqueur</span>
-        <span class="hn">${escapeText(h2?.name)}</span>
+        <span class="hn">${esc(h2?.name)}</span>
         <span class="pill ${p2Down ? "loss" : "gold"}">${d.p2.life} PV${p2Down ? " · à terre" : ""}</span></button>
     </div>
     <div class="actions">

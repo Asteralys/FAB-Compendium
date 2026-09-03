@@ -5,12 +5,12 @@
  * n'importe quel autre match, sans logique séparée à maintenir.
  */
 
-import { html, toast } from "../core/dom.js";
+import { html, toast, esc } from "../core/dom.js";
 import { S, commit, uid, deckById, tournamentById, record } from "../core/store.js";
-import { heroById, allHeroes } from "../data/heroes.js";
+import { heroById, preferredArt } from "../data/heroes.js";
 import { openSheet, closeSheet, confirmSheet } from "../ui/sheet.js";
 import { pickHero } from "../ui/heropicker.js";
-import { crest, ratePill, formatDate, dayNumber, monthLabel, countdown, today } from "../ui/components.js";
+import { crest, ratePill, formatDate, dayNumber, monthLabel, countdown, today, heroSelectGroups, deckOptions } from "../ui/components.js";
 import { icon } from "../ui/icons.js";
 import { FORMATS, ageMismatchIssue } from "../data/rules.js";
 import { goToTab } from "../core/nav.js";
@@ -91,7 +91,7 @@ function detail(t) {
       <div class="row wrap" style="gap:6px">
         ${t.standing ? html`<span class="pill gold">${t.standing}</span>` : ""}
       </div>
-      ${t.notes ? html`<div class="small faint">${escapeText(t.notes)}</div>` : ""}
+      ${t.notes ? html`<div class="small faint">${esc(t.notes)}</div>` : ""}
     </div>
 
     ${t.fabraryUrl ? html`
@@ -166,23 +166,23 @@ function form(id) {
   const t = id ? tournamentById(id) : { name: "", date: "", place: "", kind: "Armory", format: "Classic Constructed", deckId: "", notes: "", standing: "", fabraryUrl: "" };
 
   const inner = openSheet(`<h3>${id ? "Modifier le tournoi" : "Nouveau tournoi"}</h3>
-    <label class="field"><span>Nom</span><input id="tf-name" value="${attr(t.name)}" placeholder="ex : Armory du samedi"></label>
+    <label class="field"><span>Nom</span><input id="tf-name" value="${esc(t.name)}" placeholder="ex : Armory du samedi"></label>
     <div class="row">
-      <label class="field grow"><span>Date</span><input id="tf-date" type="date" value="${attr(t.date)}"></label>
+      <label class="field grow"><span>Date</span><input id="tf-date" type="date" value="${esc(t.date)}"></label>
       <label class="field grow"><span>Type</span><select id="tf-kind">
         ${KINDS.map((k) => `<option ${k === t.kind ? "selected" : ""}>${k}</option>`).join("")}</select></label>
     </div>
-    <label class="field"><span>Lieu</span><input id="tf-place" value="${attr(t.place)}" placeholder="Boutique, ville"></label>
+    <label class="field"><span>Lieu</span><input id="tf-place" value="${esc(t.place)}" placeholder="Boutique, ville"></label>
     <div class="row">
       <label class="field grow"><span>Format</span><select id="tf-format">
         ${FORMATS.map((f) => `<option ${f === t.format ? "selected" : ""}>${f}</option>`).join("")}</select></label>
       <label class="field grow"><span>Deck utilisé</span><select id="tf-deck">
         <option value="">— à décider —</option>
-        ${S.decks.map((d) => `<option value="${d.id}" ${d.id === t.deckId ? "selected" : ""}>${d.name}</option>`).join("")}</select></label>
+        ${deckOptions(t.deckId)}</select></label>
     </div>
-    <label class="field"><span>Lien decklist FaBrary</span><input id="tf-fabrary" value="${attr(t.fabraryUrl)}" placeholder="https://fabrary.net/decks/…"></label>
-    <label class="field"><span>Classement / résultat final</span><input id="tf-standing" value="${attr(t.standing)}" placeholder="ex : 3-1, top 8"></label>
-    <label class="field"><span>Notes</span><textarea id="tf-notes" placeholder="Inscription, horaire, covoiturage…">${attr(t.notes)}</textarea></label>
+    <label class="field"><span>Lien decklist FaBrary</span><input id="tf-fabrary" value="${esc(t.fabraryUrl)}" placeholder="https://fabrary.net/decks/…"></label>
+    <label class="field"><span>Classement / résultat final</span><input id="tf-standing" value="${esc(t.standing)}" placeholder="ex : 3-1, top 8"></label>
+    <label class="field"><span>Notes</span><textarea id="tf-notes" placeholder="Inscription, horaire, covoiturage…">${esc(t.notes)}</textarea></label>
     <div class="actions"><button class="btn" data-close>Annuler</button>
       <button class="btn primary" id="tf-save">Enregistrer</button></div>`);
 
@@ -226,7 +226,7 @@ function pickRoundDeck(defaultDeckId) {
       <label class="field"><span>Deck</span>
         <select id="rd-deck">
           <option value="">— pas de deck, juste un héros —</option>
-          ${S.decks.map((d) => `<option value="${d.id}" ${d.id === defaultDeckId ? "selected" : ""}>${d.name}</option>`).join("")}
+          ${deckOptions(defaultDeckId)}
         </select>
       </label>
       <div class="actions"><button class="btn" data-close>Annuler</button>
@@ -259,7 +259,7 @@ async function launchRound(tournamentId) {
   }
 
   const deck = deckId ? deckById(deckId) : null;
-  let p1 = deck ? { heroId: deck.heroId, artUrl: S.prefs.artByHero?.[deck.heroId] || heroById(deck.heroId)?.arts?.[0]?.url || null } : null;
+  let p1 = deck ? { heroId: deck.heroId, artUrl: preferredArt(deck.heroId) } : null;
   if (!p1?.heroId) {
     p1 = await pickHero({ title: "Mon héros" });
     if (!p1) return;
@@ -301,10 +301,6 @@ function roundForm(tournamentId, matchId) {
   const nextRound = m ? m.round : (rounds.length ? Math.max(...rounds.map((x) => x.round || 0)) + 1 : 1);
   let oppHeroId = m?.oppHeroId || null;
 
-  const adults = allHeroes().filter((h) => !h.young);
-  const young = allHeroes().filter((h) => h.young);
-  const heroOptions = (list) => list.map((h) => `<option value="${h.id}" ${h.id === oppHeroId ? "selected" : ""}>${h.name}</option>`).join("");
-
   const inner = openSheet(`<h3>${m ? `Modifier le round ${m.round}` : "Nouveau round"}</h3>
     <div class="row">
       <label class="field grow"><span>Round n°</span><input id="rf-round" type="number" min="1" value="${nextRound}"></label>
@@ -314,12 +310,11 @@ function roundForm(tournamentId, matchId) {
     <label class="field"><span>Héros adverse</span>
       <select id="rf-opp">
         <option value="">— choisir —</option>
-        <optgroup label="Adultes">${heroOptions(adults)}</optgroup>
-        <optgroup label="Jeunes">${heroOptions(young)}</optgroup>
+        ${heroSelectGroups(oppHeroId)}
       </select>
     </label>
-    <label class="field"><span>Deck adverse</span><input id="rf-oppdeck" value="${attr(m?.oppDeck)}" placeholder="optionnel"></label>
-    <label class="field"><span>Score des manches (optionnel)</span><input id="rf-score" value="${attr(m?.score)}" placeholder="ex : 2-1"></label>
+    <label class="field"><span>Deck adverse</span><input id="rf-oppdeck" value="${esc(m?.oppDeck)}" placeholder="optionnel"></label>
+    <label class="field"><span>Score des manches (optionnel)</span><input id="rf-score" value="${esc(m?.score)}" placeholder="ex : 2-1"></label>
     <div class="actions">
       ${m ? `<button class="btn danger" id="rf-del">Supprimer</button>` : ""}
       <button class="btn" id="rf-loss">Défaite</button>
@@ -338,7 +333,7 @@ function roundForm(tournamentId, matchId) {
       deckId: t.deckId || null,
       heroId: deckById(t.deckId)?.heroId || null,
       oppHeroId,
-      artUrlOpp: S.prefs.artByHero?.[oppHeroId] || heroById(oppHeroId)?.arts?.[0]?.url || null,
+      artUrlOpp: preferredArt(oppHeroId),
       oppDeck: inner.querySelector("#rf-oppdeck").value.trim(),
       score: inner.querySelector("#rf-score").value.trim(),
       result,
@@ -362,9 +357,6 @@ function roundForm(tournamentId, matchId) {
     }
   });
 }
-
-const attr = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const escapeText = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
 /** Ouvre directement la fiche d'un tournoi (utilisé depuis duel.js en fin de round). */
 export function openTournament(id) { openId = id; }

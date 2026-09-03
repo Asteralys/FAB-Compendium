@@ -5,6 +5,7 @@
  */
 
 import { slimHeroes, heroSubtitle, heroColor } from "./slim.js";
+import { S } from "../core/store.js";
 
 const BASE = "https://raw.githubusercontent.com/the-fab-cube/flesh-and-blood-cards/develop/json/english";
 const CACHE_KEY = "fab.heroes.v1";
@@ -73,8 +74,20 @@ export function talentList() {
 /** « Pit-Fighter » se lit mieux sans le trait d'union. */
 export const talentLabel = (t) => t.replace("-", " ");
 
-export const heroArt = (hero, url) =>
-  url || hero?.arts?.[0]?.url || null;
+/**
+ * Illustration à afficher pour un héros : celle mémorisée depuis le
+ * sélecteur si elle existe encore parmi ses tirages actuels, sinon le
+ * premier tirage. Seul point de vérité — heropicker, decks, stats et
+ * tournois s'en servent tous au lieu de relire `S.prefs.artByHero` chacun
+ * de son côté.
+ */
+export function preferredArt(heroId) {
+  const hero = heroById(heroId);
+  if (!hero) return null;
+  const pref = S.prefs.artByHero?.[heroId];
+  if (pref && hero.arts.some((a) => a.url === pref)) return pref;
+  return hero.arts[0]?.url || null;
+}
 
 export const initials = (name = "?") =>
   name.replace(/[^A-Za-zÀ-ÿ ]/g, " ").trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";

@@ -1,6 +1,6 @@
 /** Decks : bibliothèque, decklist zonée, fiche détaillée et plans de side par matchup. */
 
-import { html, raw, toast } from "../core/dom.js";
+import { html, raw, toast, esc } from "../core/dom.js";
 import { S, commit, save, uid, deckById, record } from "../core/store.js";
 import { heroById, heroSubtitle } from "../data/heroes.js";
 import {
@@ -10,7 +10,7 @@ import {
 import { FORMATS, formatRules, deckIssues, splitZones, zoneTotal } from "../data/rules.js";
 import { openSheet, closeSheet, confirmSheet } from "../ui/sheet.js";
 import { pickHero, legendPill } from "../ui/heropicker.js";
-import { crest, ratePill } from "../ui/components.js";
+import { crest, ratePill, bulletList } from "../ui/components.js";
 import { icon } from "../ui/icons.js";
 
 const PITCHES = [["1", "Rouge"], ["2", "Jaune"], ["3", "Bleu"]];
@@ -118,7 +118,7 @@ function detail(d) {
       ${issues.map((msg) => html`<div class="errorline">${icon("warn", 15)}<span>${msg}</span></div>`)}
     </div>` : ""}
 
-    ${d.notes ? html`<div class="panel small">${raw(escapeText(d.notes).replace(/\n/g, "<br>"))}</div>` : ""}
+    ${d.notes ? html`<div class="panel small">${raw(esc(d.notes).replace(/\n/g, "<br>"))}</div>` : ""}
 
     ${decklistPanel(d)}
 
@@ -354,8 +354,8 @@ function cardResultRow(c, qty) {
   const stats = [c.cost !== "" ? `coût ${c.cost}` : "", c.power ? `${c.power} force` : "", c.defense ? `${c.defense} déf.` : ""].filter(Boolean).join(" · ");
   return `<div class="cardresult">
     <span class="pitchdot p${c.pitch || 0}"></span>
-    <button class="thumb" data-card="${c.key}" aria-label="Voir ${escapeText(c.name)}">${c.img ? `<img alt="" loading="lazy" src="${cardImage(c.img)}" onerror="this.remove()">` : ""}</button>
-    <button class="info" data-card="${c.key}"><b>${escapeText(c.name)}</b><span>${c.types.join(" ")}${stats ? " · " + stats : ""}</span></button>
+    <button class="thumb" data-card="${c.key}" aria-label="Voir ${esc(c.name)}">${c.img ? `<img alt="" loading="lazy" src="${cardImage(c.img)}" onerror="this.remove()">` : ""}</button>
+    <button class="info" data-card="${c.key}"><b>${esc(c.name)}</b><span>${c.types.join(" ")}${stats ? " · " + stats : ""}</span></button>
     <span class="qtybox">
       <button class="step" data-adj="${c.key}§-1" aria-label="Retirer un exemplaire" ${qty ? "" : "disabled"}>−</button>
       <span class="q">${qty || 0}</span>
@@ -382,7 +382,7 @@ function cardPreview(key) {
   const card = cardByKey(key) || cardsNamed(key.split("|")[0])[0];
   if (!card) { toast("Carte introuvable."); return; }
   const url = cardImage(card.img);
-  openSheet(`<h3>${escapeText(card.name)}</h3>
+  openSheet(`<h3>${esc(card.name)}</h3>
     <div class="row wrap" style="gap:6px">
       <span class="pill">${card.types.join(" · ")}</span>
       ${card.pitch ? `<span class="pill">Pitch ${PITCH_LABEL[card.pitch]}</span>` : ""}
@@ -392,7 +392,7 @@ function cardPreview(key) {
       <span class="pill ${card.cc ? "win" : "loss"}">CC ${card.cc ? "légal" : "non légal"}</span>
       <span class="pill ${card.blitz ? "win" : "loss"}">Blitz ${card.blitz ? "légal" : "non légal"}</span>
     </div>
-    ${url ? `<div class="cardpreview"><img alt="${escapeText(card.name)}" src="${url}" onerror="this.closest('.cardpreview').innerHTML='<p class=\\'muted small\\'>Illustration indisponible hors connexion.</p>'"></div>` : ""}
+    ${url ? `<div class="cardpreview"><img alt="${esc(card.name)}" src="${url}" onerror="this.closest('.cardpreview').innerHTML='<p class=\\'muted small\\'>Illustration indisponible hors connexion.</p>'"></div>` : ""}
     <div class="actions"><button class="btn" data-close>Fermer</button></div>`);
 }
 
@@ -444,9 +444,9 @@ function importSheet(deckId) {
     pending = result;
     report.innerHTML = `<div class="panel stack tight">
       <div><b>${countList(result.entries)} cartes</b> · ${result.entries.length} références</div>
-      ${result.ambiguous.length ? `<div class="small" style="color:var(--pitch-yellow)">Couleur non précisée pour : ${result.ambiguous.map(escapeText).join(", ")}. La première version a été retenue.</div>` : ""}
-      ${result.recolored.length ? `<div class="small" style="color:var(--pitch-yellow)">Couleur introuvable, corrigée : ${result.recolored.map(escapeText).join(" · ")}</div>` : ""}
-      ${result.unknown.length ? `<div class="small" style="color:var(--loss)">Lignes ignorées : ${result.unknown.slice(0, 8).map(escapeText).join(" / ")}${result.unknown.length > 8 ? "…" : ""}</div>` : ""}
+      ${result.ambiguous.length ? `<div class="small" style="color:var(--pitch-yellow)">Couleur non précisée pour : ${result.ambiguous.map(esc).join(", ")}. La première version a été retenue.</div>` : ""}
+      ${result.recolored.length ? `<div class="small" style="color:var(--pitch-yellow)">Couleur introuvable, corrigée : ${result.recolored.map(esc).join(" · ")}</div>` : ""}
+      ${result.unknown.length ? `<div class="small" style="color:var(--loss)">Lignes ignorées : ${result.unknown.slice(0, 8).map(esc).join(" / ")}${result.unknown.length > 8 ? "…" : ""}</div>` : ""}
     </div>`;
     inner.querySelector("#im-go").textContent = "Importer";
   });
@@ -467,17 +467,12 @@ function planCard(d, p) {
       <button class="btn ghost" data-plan="${p.id}" style="min-height:36px;padding:6px 12px">Éditer</button>
     </div>
     <div class="plan"><div class="swap">
-      <div class="col in"><h4>Entrées</h4><ul>${bullets(p.in)}</ul></div>
-      <div class="col out"><h4>Sorties</h4><ul>${bullets(p.out)}</ul></div>
+      <div class="col in"><h4>Entrées</h4><ul>${bulletList(p.in)}</ul></div>
+      <div class="col out"><h4>Sorties</h4><ul>${bulletList(p.out)}</ul></div>
     </div></div>
-    ${p.notes ? html`<div class="small muted">${p.notes}</div>` : ""}
+    ${p.notes ? html`<div class="small muted">${raw(esc(p.notes).replace(/\n/g, "<br>"))}</div>` : ""}
   </div>`;
 }
-
-const bullets = (text) => {
-  const items = String(text ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
-  return items.length ? items.map((l) => html`<li>${l}</li>`) : html`<li class="faint">—</li>`;
-};
 
 export function matchupTable(filter) {
   const buckets = new Map();
@@ -516,10 +511,10 @@ function deckForm(id) {
       <span class="grow"><span class="name" id="df-heroname">${heroById(heroId)?.name || "Choisir un héros"}</span>
       <span class="meta" id="df-herometa">${heroById(heroId) ? heroSubtitle(heroById(heroId)) : "jeune ou adulte"}</span></span>
     </button>
-    <label class="field"><span>Nom du deck</span><input id="df-name" value="${attr(d.name)}" placeholder="ex : Briar Aggro"></label>
+    <label class="field"><span>Nom du deck</span><input id="df-name" value="${esc(d.name)}" placeholder="ex : Briar Aggro"></label>
     <label class="field"><span>Format</span><select id="df-format">
       ${FORMATS.map((f) => `<option ${f === d.format ? "selected" : ""}>${f}</option>`).join("")}</select></label>
-    <label class="field"><span>Notes, plan de jeu</span><textarea id="df-notes" placeholder="Lien FaBrary, cartes clés, lignes de jeu…">${attr(d.notes)}</textarea></label>
+    <label class="field"><span>Notes, plan de jeu</span><textarea id="df-notes" placeholder="Lien FaBrary, cartes clés, lignes de jeu…">${esc(d.notes)}</textarea></label>
     <div class="actions"><button class="btn" data-close>Annuler</button>
       <button class="btn primary" id="df-save">Enregistrer</button></div>`);
 
@@ -567,9 +562,9 @@ function planForm(deckId, planId) {
       <span class="grow"><span class="name" id="pf-heroname">${heroById(oppHeroId)?.name || "Héros adverse"}</span>
       <span class="meta">le plan s'ouvrira automatiquement pendant le duel</span></span>
     </button>
-    <label class="field"><span>Cartes à rentrer</span><textarea id="pf-in" placeholder="Une carte par ligne">${attr(p.in)}</textarea></label>
-    <label class="field"><span>Cartes à sortir</span><textarea id="pf-out" placeholder="Une carte par ligne">${attr(p.out)}</textarea></label>
-    <label class="field"><span>Notes de matchup</span><textarea id="pf-notes" placeholder="Qui a l'initiative, quelles menaces bloquer…">${attr(p.notes)}</textarea></label>
+    <label class="field"><span>Cartes à rentrer</span><textarea id="pf-in" placeholder="Une carte par ligne">${esc(p.in)}</textarea></label>
+    <label class="field"><span>Cartes à sortir</span><textarea id="pf-out" placeholder="Une carte par ligne">${esc(p.out)}</textarea></label>
+    <label class="field"><span>Notes de matchup</span><textarea id="pf-notes" placeholder="Qui a l'initiative, quelles menaces bloquer…">${esc(p.notes)}</textarea></label>
     <div class="actions">
       ${planId ? '<button class="btn danger" id="pf-del">Supprimer</button>' : ""}
       <button class="btn" data-close>Annuler</button>
@@ -606,8 +601,3 @@ function planForm(deckId, planId) {
   });
 }
 
-const escapeText = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-const attr = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-
-/** Ouvre directement la fiche d'un deck (utilisé depuis les autres onglets). */
-export function openDeck(id) { openId = id; }
