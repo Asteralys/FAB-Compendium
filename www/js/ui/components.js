@@ -1,7 +1,8 @@
 /** Fragments réutilisés par plusieurs vues. */
 
-import { html, raw } from "../core/dom.js";
-import { heroById, heroColor, heroSubtitle, initials } from "../data/heroes.js";
+import { html, raw, esc } from "../core/dom.js";
+import { S } from "../core/store.js";
+import { allHeroes, heroColor, initials } from "../data/heroes.js";
 
 /**
  * Vignette d'un héros. Si l'illustration ne charge pas (hors-ligne, réseau
@@ -17,14 +18,34 @@ export function crest(hero, artUrl = null, size = "") {
   </div>`;
 }
 
-export const crestFor = (heroId, artUrl, size) => crest(heroById(heroId), artUrl, size);
-
-export function heroLine(hero) {
-  if (!hero) return "—";
-  return html`${hero.name} <span class="faint small">· ${hero.life} PV</span>`;
+/**
+ * `<optgroup>` Adultes/Jeunes pour un `<select>` de héros — utilisé par les
+ * formulaires qui n'ont pas besoin du sélecteur visuel complet (choisir
+ * l'adversaire d'un match ou d'un round de tournoi, par exemple).
+ */
+export function heroSelectGroups(selectedId = null) {
+  const opt = (h) => `<option value="${h.id}" ${h.id === selectedId ? "selected" : ""}>${esc(h.name)}</option>`;
+  const adults = allHeroes().filter((h) => !h.young).map(opt).join("");
+  const young = allHeroes().filter((h) => h.young).map(opt).join("");
+  return raw(`<optgroup label="Adultes">${adults}</optgroup><optgroup label="Jeunes">${young}</optgroup>`);
 }
 
-export const subtitle = (hero) => (hero ? heroSubtitle(hero) : "");
+/** `<option>` pour chaque deck du joueur — utilisé par tous les formulaires qui en proposent le choix. */
+export function deckOptions(selectedId = null) {
+  return raw(S.decks.map((d) => `<option value="${d.id}" ${d.id === selectedId ? "selected" : ""}>${esc(d.name)}</option>`).join(""));
+}
+
+/**
+ * Liste à puces à partir d'un texte libre, une entrée par ligne ; tiret si
+ * vide. Renvoie un Raw plutôt qu'un tableau de fragments : ça reste correct
+ * qu'on l'interpole dans un gabarit `html\`\`` ou dans une chaîne brute
+ * (feuille ouverte via openSheet), les deux existent selon les vues.
+ */
+export function bulletList(text) {
+  const items = String(text ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const body = items.length ? items.map((l) => `<li>${esc(l)}</li>`).join("") : `<li class="faint">—</li>`;
+  return raw(body);
+}
 
 /* ------------------------------ dates ------------------------------ */
 
@@ -73,5 +94,3 @@ export function winBar(label, wins, played) {
     <div class="val">${wins}-${played - wins}</div>
   </div>`;
 }
-
-export const lines = (text) => raw(String(text ?? "").split("\n").filter(Boolean).map((l) => `<li>${l.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]))}</li>`).join(""));

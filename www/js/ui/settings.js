@@ -6,6 +6,7 @@ import { openSheet, closeSheet, confirmSheet } from "./sheet.js";
 import { heroesVersion, allHeroes, resetHeroes, heroById } from "../data/heroes.js";
 import { allCards, cardsVersion, resetCards } from "../data/cards.js";
 import { legendDate, resetLegend } from "../data/legend.js";
+import { allArtUrls, cachedArtCount, predownloadArt } from "../data/offline.js";
 
 export function applySkin() {
   document.documentElement.dataset.skin = S.prefs.skin === "vellum" ? "vellum" : "ombre";
@@ -35,6 +36,14 @@ export function openSettings() {
     <div class="small muted">${S.decks.length} decks · ${S.matches.length} matchs · ${S.tournaments.length} tournois</div>
     <div class="small faint">${allHeroes().length} héros (${heroesVersion()}) · ${allCards().length} cartes (${cardsVersion()}) · classement LL du ${legendDate()}</div>
 
+    <hr class="rule">
+
+    <div class="small muted" id="se-art-status">Illustrations hors connexion : vérification du cache…</div>
+    <div id="se-art-bar"></div>
+    <button class="btn" id="se-art-download">Tout télécharger pour l'usage hors connexion</button>
+
+    <hr class="rule">
+
     <button class="btn" id="se-export">Exporter mes données</button>
     <button class="btn" id="se-export-stats">Exporter mes statistiques (CSV — Metafy, FaBrary…)</button>
     <label class="field"><span>Importer une sauvegarde</span>
@@ -59,6 +68,31 @@ export function openSettings() {
   qs("#se-round", inner).addEventListener("change", (e) => {
     S.prefs.roundLimit = Math.min(120, Math.max(5, Number(e.target.value) || 40));
     commit();
+  });
+
+  const artTotal = allArtUrls().length;
+  updateArtStatus(inner, artTotal);
+
+  qs("#se-art-download", inner).addEventListener("click", async () => {
+    const btn = qs("#se-art-download", inner);
+    const status = qs("#se-art-status", inner);
+    const bar = qs("#se-art-bar", inner);
+    if (!btn || !status || !bar) return;
+
+    btn.disabled = true;
+    bar.innerHTML = '<div class="progress"><i style="width:0"></i></div>';
+    const fill = bar.querySelector("i");
+
+    await predownloadArt((done, total) => {
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      status.textContent = `Téléchargement des illustrations… ${done} / ${total} (${pct} %)`;
+      if (fill) fill.style.width = `${pct}%`;
+    });
+
+    bar.innerHTML = "";
+    btn.disabled = false;
+    toast("Illustrations téléchargées — utilisables sans connexion");
+    updateArtStatus(inner, artTotal);
   });
 
   qs("#se-export", inner).addEventListener("click", async () => {
@@ -172,3 +206,17 @@ function statsCSV() {
 }
 
 const csvCell = (v) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+
+/** Combien d'illustrations sont déjà en cache, affiché avant de proposer le téléchargement complet. */
+async function updateArtStatus(inner, total) {
+  const status = qs("#se-art-status", inner);
+  if (!status) return; // la feuille a été fermée entre-temps
+  const cached = await cachedArtCount();
+  if (cached === null) {
+    status.textContent = `Illustrations hors connexion : ${total} au total (~280 Mo) — cache indisponible sur ce navigateur.`;
+    return;
+  }
+  status.textContent = cached >= total
+    ? `Illustrations hors connexion : toutes disponibles (${total}).`
+    : `Illustrations hors connexion : ${cached} / ${total} déjà en cache (~280 Mo au total si tout est téléchargé).`;
+}

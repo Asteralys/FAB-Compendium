@@ -1,6 +1,6 @@
 /* Service worker : l'app doit rester utilisable en salle de tournoi, sans réseau. */
 
-const CACHE = "fab-compendium-v4";
+const CACHE = "fab-compendium-v5";
 const MEDIA = "fab-media-v1";   // illustrations de cartes et polices
 
 const SHELL = [
@@ -15,9 +15,11 @@ const SHELL = [
   "./js/main.js",
   "./js/core/dom.js",
   "./js/core/store.js",
+  "./js/core/nav.js",
   "./js/data/heroes.js",
   "./js/data/cards.js",
   "./js/data/rules.js",
+  "./js/data/offline.js",
   "./js/data/banned.js",
   "./js/data/legend.js",
   "./js/data/ll-parse.js",

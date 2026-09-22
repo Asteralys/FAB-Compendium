@@ -17,12 +17,32 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PAGE = "https://fabtcg.com/living-legend/";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36";
 
+/**
+ * fabtcg.com bloque les IP de datacenter (GitHub Actions y compris — HTTP 403,
+ * quel que soit le user-agent). Ça ne doit jamais faire échouer `npm run data` :
+ * heroes/cards/banned n'ont rien à voir avec cette page, et l'instantané déjà
+ * commité reste tout à fait utilisable. On échoue proprement (code 0) plutôt
+ * que de bloquer la mise à jour des autres bases.
+ */
 process.stdout.write("Course au Living Legend — fabtcg.com … ");
-const res = await fetch(PAGE, { headers: { "user-agent": UA, accept: "text/html" } });
-if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+let res;
+try {
+  res = await fetch(PAGE, { headers: { "user-agent": UA, accept: "text/html" } });
+} catch (err) {
+  console.log(`\n⚠ requête impossible (${err.message}) — instantané conservé tel quel.`);
+  process.exit(0);
+}
+if (!res.ok) {
+  console.log(`\n⚠ fabtcg.com a répondu HTTP ${res.status} (bloque probablement cette IP) — instantané conservé tel quel.`);
+  process.exit(0);
+}
 
 const data = parseLivingLegend(await res.text());
-if (!data.board.length) throw new Error("Tableau introuvable — la page a changé de structure.");
+if (!data.board.length) {
+  console.log("\n⚠ tableau introuvable — la page a peut-être changé de structure. Instantané conservé tel quel.");
+  process.exit(0);
+}
 
 await writeFile(join(ROOT, "www", "data", "living-legend.json"), JSON.stringify(data));
 console.log(`${data.board.length} héros en course, ${data.legends.length} déjà Living Legend`);

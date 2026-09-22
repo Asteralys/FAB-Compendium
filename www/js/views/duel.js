@@ -7,14 +7,16 @@
  * d'entrer au journal (on tape « −3 » en trois fois, une seule ligne d'historique).
  */
 
-import { html, raw, qs, qsa, toast, buzz } from "../core/dom.js";
+import { html, raw, qs, qsa, toast, buzz, esc } from "../core/dom.js";
 import { S, commit, save, uid, deckById } from "../core/store.js";
 import { heroById, heroSubtitle } from "../data/heroes.js";
 import { icon } from "../ui/icons.js";
 import { openSheet, closeSheet, confirmSheet } from "../ui/sheet.js";
 import { pickHero } from "../ui/heropicker.js";
-import { crest, clock, today } from "../ui/components.js";
+import { crest, clock, today, bulletList, deckOptions } from "../ui/components.js";
 import { FORMATS, ageMismatchIssue } from "../data/rules.js";
+import { openTournament } from "./tournaments.js";
+import { goToTab } from "../core/nav.js";
 
 const BATCH_MS = 3000;
 
@@ -82,7 +84,7 @@ function setupScreen() {
       <label class="field"><span>Mon deck</span>
         <select id="su-deck">
           <option value="">— sans deck —</option>
-          ${raw(S.decks.map((d) => `<option value="${d.id}" ${d.id === setup.p1.deckId ? "selected" : ""}>${d.name}</option>`).join(""))}
+          ${deckOptions(setup.p1.deckId)}
         </select>
       </label>
       <label class="field"><span>Deck adverse</span>
@@ -227,7 +229,7 @@ function board() {
       ${railButton("side", "cards", "Side")}
       ${railButton("log", "history", "Journal")}
       <button data-act="timer" class="timerbtn">
-        <span class="clock" data-clock>${clock(elapsed())}</span>
+        <span class="clock" data-clock>${clock(remaining())}</span>
         <span>${d.timer.running ? "Pause" : "Chrono"}</span>
       </button>
       ${railButton("end", "flag", "Fin")}
@@ -241,6 +243,13 @@ const elapsed = () => {
   if (!t) return 0;
   return t.elapsed + (t.running ? (Date.now() - t.since) / 1000 : 0);
 };
+
+/**
+ * Temps restant avant l'alerte de ronde — un décompte, pas un chrono qui
+ * s'allonge. `clock()` ramène tout seul un temps négatif à 00:00 une fois
+ * la limite dépassée.
+ */
+const remaining = () => (S.prefs.roundLimit || 40) * 60 - elapsed();
 
 /* ------------------------ interactions ----------------------- */
 
@@ -283,11 +292,10 @@ function startTick(root) {
   tick = setInterval(() => {
     const el = qs("[data-clock]", root);
     if (!el || !S.duel) return;
-    const secs = elapsed();
-    el.textContent = clock(secs);
-    const limit = (S.prefs.roundLimit || 40) * 60;
-    el.classList.toggle("warn", secs > limit - 300 && secs <= limit);
-    el.classList.toggle("over", secs > limit);
+    const left = remaining();
+    el.textContent = clock(left);
+    el.classList.toggle("warn", left <= 300 && left > 0);
+    el.classList.toggle("over", left <= 0);
   }, 1000);
 }
 
@@ -321,7 +329,12 @@ function nudge(root, side, step) {
 }
 
 /** Verse les coups accumulés dans le journal. */
-function flushPending(root = document) {
+/**
+ * @param {boolean} autoEnd Propose la fin de partie si un PV est tombé à 0.
+ *   À false pour les appels internes à endSheet lui-même (sinon boucle : il
+ *   vide déjà les coups en attente avant d'afficher sa propre feuille).
+ */
+function flushPending(root = document, autoEnd = true) {
   clearTimeout(flushTimer);
   flushTimer = null;
   let wrote = false;
@@ -339,13 +352,20 @@ function flushPending(root = document) {
     const el = qs(`[data-delta="${side}"]`, root);
     if (el) el.hidden = true;
   }
-  if (wrote) save();
+  if (!wrote) return;
+  save();
+
+  // Un des deux est tombé à 0 (ou moins) et le chiffre s'est stabilisé :
+  // on propose directement d'enregistrer le résultat, sans étape en plus.
+  if (autoEnd && S.duel && (S.duel.p1.life <= 0 || S.duel.p2.life <= 0) && !qs(".sheet")) {
+    endSheet(root);
+  }
 }
 
 /* --------------------------- actions ------------------------- */
 
 function undo(root) {
-  flushPending(root);
+  flushPending(root, false);
   const entry = S.duel.log.pop();
   if (!entry) { toast("Rien à annuler"); return; }
   S.duel[entry.side].life -= entry.delta;
@@ -360,7 +380,7 @@ function toggleTimer() {
 }
 
 function openLog(root) {
-  flushPending(root);
+  flushPending(root, false);
   const rows = [...S.duel.log].reverse();
   const inner = openSheet(
     `<h3>Journal des dégâts</h3>
@@ -403,29 +423,34 @@ function sidePlan() {
   const plan = (deck.plans || []).find((p) => p.oppHeroId === oppId);
   openSheet(`<h3>${deck.name} <span class="muted">vs ${opp?.name || "?"}</span></h3>
     ${plan ? `<div class="plan"><div class="swap">
-        <div class="col in"><h4>Entrées</h4><ul>${listItems(plan.in)}</ul></div>
-        <div class="col out"><h4>Sorties</h4><ul>${listItems(plan.out)}</ul></div>
-      </div>${plan.notes ? `<p class="small muted">${escapeText(plan.notes)}</p>` : ""}</div>`
+        <div class="col in"><h4>Entrées</h4><ul>${bulletList(plan.in)}</ul></div>
+        <div class="col out"><h4>Sorties</h4><ul>${bulletList(plan.out)}</ul></div>
+      </div>${plan.notes ? `<p class="small muted">${esc(plan.notes)}</p>` : ""}</div>`
       : `<div class="empty">Pas encore de plan contre ${opp?.name || "ce héros"}.<br>Tu peux le créer depuis l'onglet Decks.</div>`}
     <div class="actions"><button class="btn" data-close>Fermer</button></div>`);
 }
 
-const escapeText = (t) => String(t ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-const listItems = (t) => String(t ?? "").split("\n").filter(Boolean).map((l) => `<li>${escapeText(l)}</li>`).join("") || "<li class='faint'>—</li>";
 
 function endSheet(root) {
-  flushPending(root);
+  flushPending(root, false);
   const d = S.duel;
   const h1 = heroById(d.p1.heroId);
   const h2 = heroById(d.p2.heroId);
+  const p1Down = d.p1.life <= 0;
+  const p2Down = d.p2.life <= 0;
 
+  // Les deux boutons proposent la même action (« tape le héros qui a gagné »).
+  // « Victoire »/« Défaite » fixés à gauche/droite induisaient en erreur :
+  // le joueur à 0 PV n'est pas toujours à gauche.
   const inner = openSheet(`<h3>Fin de partie</h3>
     <p class="small muted">Qui l'emporte ? Le match part directement dans tes statistiques.</p>
     <div class="sidechoice">
-      <button class="slot p1" data-win="p1"><span class="who">Victoire</span>
-        <span class="hn">${escapeText(h1?.name)}</span><span class="pill gold">${d.p1.life} PV</span></button>
-      <button class="slot p2" data-win="p2"><span class="who">Défaite</span>
-        <span class="hn">${escapeText(h2?.name)}</span><span class="pill">${d.p2.life} PV</span></button>
+      <button class="slot p1" data-win="p1"><span class="who">Vainqueur</span>
+        <span class="hn">${esc(h1?.name)}</span>
+        <span class="pill ${p1Down ? "loss" : "gold"}">${d.p1.life} PV${p1Down ? " · à terre" : ""}</span></button>
+      <button class="slot p2" data-win="p2"><span class="who">Vainqueur</span>
+        <span class="hn">${esc(h2?.name)}</span>
+        <span class="pill ${p2Down ? "loss" : "gold"}">${d.p2.life} PV${p2Down ? " · à terre" : ""}</span></button>
     </div>
     <div class="actions">
       <button class="btn" data-close>Continuer la partie</button>
@@ -448,6 +473,8 @@ function endSheet(root) {
 
 function recordMatch(winner) {
   const d = S.duel;
+  const isRound = !!d.tournamentId;
+
   S.matches.unshift({
     id: uid(),
     date: today(),
@@ -455,6 +482,7 @@ function recordMatch(winner) {
     heroId: d.p1.heroId,
     artUrl: d.p1.artUrl || null,
     oppHeroId: d.p2.heroId,
+    artUrlOpp: d.p2.artUrl || null,
     oppDeck: d.p2.oppDeck || "",
     result: winner === "p1" ? "W" : "L",
     format: d.format,
@@ -462,22 +490,35 @@ function recordMatch(winner) {
     lifeP1: d.p1.life,
     lifeP2: d.p2.life,
     duration: Math.round(elapsed()),
-    blows: d.log.length
+    blows: d.log.length,
+    ...(isRound ? { tournamentId: d.tournamentId, round: d.round, bo: d.bo } : {})
   });
 
-  // On garde héros et deck pour enchaîner la partie suivante.
-  setup = {
-    p1: { heroId: d.p1.heroId, artUrl: d.p1.artUrl, deckId: d.p1.deckId || "" },
-    p2: { heroId: d.p2.heroId, artUrl: d.p2.artUrl, oppDeck: d.p2.oppDeck || "" },
-    format: d.format,
-    event: d.event,
-    initiative: null
-  };
+  // On garde héros et deck pour enchaîner la partie suivante — sauf pour un
+  // round de tournoi, où on repart plutôt sur sa fiche pour enchaîner le suivant.
+  if (!isRound) {
+    setup = {
+      p1: { heroId: d.p1.heroId, artUrl: d.p1.artUrl, deckId: d.p1.deckId || "" },
+      p2: { heroId: d.p2.heroId, artUrl: d.p2.artUrl, oppDeck: d.p2.oppDeck || "" },
+      format: d.format,
+      event: d.event,
+      initiative: null
+    };
+  }
 
+  const tournamentId = d.tournamentId;
   S.duel = null;
   releaseWake();
-  commit();
-  toast(winner === "p1" ? "Victoire enregistrée" : "Défaite enregistrée");
+
+  if (isRound) {
+    openTournament(tournamentId);
+    commit();
+    toast(`Round ${d.round} enregistré — ${winner === "p1" ? "victoire" : "défaite"}`);
+    goToTab("tournaments");
+  } else {
+    commit();
+    toast(winner === "p1" ? "Victoire enregistrée" : "Défaite enregistrée");
+  }
 }
 
 /* ------------------------- écran allumé ---------------------- */

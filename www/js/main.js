@@ -2,6 +2,7 @@
 
 import { qs, toast } from "./core/dom.js";
 import { S, subscribe, commit } from "./core/store.js";
+import { registerTabSwitcher } from "./core/nav.js";
 import { loadHeroes, checkForNewSets } from "./data/heroes.js";
 import { loadCards } from "./data/cards.js";
 import { loadLegend, refreshLegend } from "./data/legend.js";
@@ -61,6 +62,7 @@ function switchTab(id) {
 
 async function boot() {
   applySkin();
+  registerTabSwitcher(switchTab);
 
   try {
     await loadHeroes();

@@ -9,15 +9,14 @@ import { S, save } from "../core/store.js";
 import { openSheet, closeSheet } from "./sheet.js";
 import {
   searchHeroes, classList, talentList, talentLabel,
-  heroById, initials, heroSubtitle
+  heroById, initials, heroSubtitle, preferredArt
 } from "../data/heroes.js";
 import { legendFor, legendThreshold } from "../data/legend.js";
 import { icon } from "./icons.js";
 
 const AGES = [["all", "Tous"], ["adult", "Adultes"], ["young", "Jeunes"]];
 
-/** Illustration retenue pour ce héros la dernière fois qu'il a été choisi. */
-const heroPref = (id) => S.prefs.artByHero?.[id] || null;
+/** Mémorise l'illustration choisie pour ce héros — relue par `preferredArt()` la prochaine fois. */
 function saveHeroPref(id, url) {
   S.prefs.artByHero = S.prefs.artByHero || {};
   S.prefs.artByHero[id] = url;
@@ -93,7 +92,7 @@ export function pickHero({ title = "Choisir un héros", heroId = null, artUrl = 
     }
 
     function card(h) {
-      const art = heroPref(h.id) || h.arts[0]?.url;
+      const art = preferredArt(h.id);
       const ll = legendFor(h.name);
       return `<button class="herocard" data-hero="${h.id}" aria-pressed="${h.id === state.heroId}">
         <span class="thumb">
@@ -112,8 +111,7 @@ export function pickHero({ title = "Choisir un héros", heroId = null, artUrl = 
       const h = heroById(id);
       if (!h) return;
       state.heroId = id;
-      const pref = heroPref(id);
-      state.artUrl = (pref && h.arts.some((a) => a.url === pref)) ? pref : (h.arts[0]?.url || null);
+      state.artUrl = preferredArt(id);
 
       // Une seule illustration (ou aucune) : rien à choisir, on valide tout de suite.
       if (h.arts.length < 2) {
