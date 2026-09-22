@@ -7,6 +7,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -52,3 +55,17 @@ jobs:
           name: fab-compendium-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      # Lien stable et téléchargeable directement depuis un téléphone :
+      # un fichier .apk brut sur une page de release, sans passer par
+      # l'onglet Actions (zip protégé par connexion, peu pratique sur mobile).
+      # Le tag est toujours le même : chaque build remplace le précédent.
+      - name: Publier une Release avec l'APK (lien stable pour le téléphone)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete debug-latest --yes --cleanup-tag || true
+          gh release create debug-latest android/app/build/outputs/apk/debug/*.apk \
+            --title "Dernier build de test ($(date -u +%Y-%m-%d))" \
+            --notes "APK de test généré automatiquement à chaque envoi sur main. Toujours le même lien — pas besoin de revenir ici à chaque fois." \
+            --prerelease

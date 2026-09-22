@@ -103,12 +103,19 @@ GitHub Pages, déjà configuré :
 
 ### En APK — sans rien installer sur ta machine
 
-Le dépôt contient un workflow GitHub Actions qui compile l'APK dans le cloud.
+Le dépôt contient un workflow GitHub Actions qui compile l'APK dans le cloud
+et le publie à chaque fois sur la même page de release — un lien fixe,
+à téléchargement direct, pratique depuis le téléphone (pas besoin de repasser
+par l'onglet Actions ni de dézipper quoi que ce soit) :
 
-1. pousser le projet sur GitHub ;
-2. onglet **Actions → APK Android → Run workflow** ;
-3. télécharger `fab-compendium-debug-apk` en bas de l'exécution ;
-4. copier l'APK sur le téléphone et l'installer (autoriser les sources inconnues).
+**https://github.com/Asteralys/FAB-Compendium/releases/download/debug-latest/app-debug.apk**
+
+Ouvrir ce lien dans le navigateur du téléphone télécharge directement le
+`.apk` ; Android propose ensuite de l'installer (autoriser les sources
+inconnues au premier essai).
+
+Pour déclencher un nouveau build à la main : onglet **Actions → APK Android
+→ Run workflow**. Sinon, chaque envoi sur `main` en relance un automatiquement.
 
 ### En APK — en local
 
